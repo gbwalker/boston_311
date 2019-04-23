@@ -17,15 +17,16 @@ raw <- read_csv("311_all.csv")
 # In total this is about 683,000 rows.
 
 df <- raw %>% 
-  filter(open_dt > "2016-01-01") %>% 
+  filter(open_dt >= "2016-01-01") %>% 
   
 # Select only the variables of interest.
 # No case_title because there are too many to factor them.
+# No latitude, longitude, 
 # Note that type may need to be dropped from any ML algorithm because it has too many levels.
   
   select(open_dt, target_dt, closed_dt, reason, type, department,
          fire_district, pwd_district, city_council_district, police_district,
-         neighborhood, ward, location_zipcode, source, latitude, longitude)
+         neighborhood, ward, location_zipcode, source)
 
 # Count the NA values for each variable.
 
@@ -49,6 +50,14 @@ df <- df %>%
   mutate(month_open = month(df$open_dt)) %>% 
   mutate(month_open = month.name[month_open]) %>% 
 
+# Add a time of day factor variable for when the issue was submitted.
+  
+  mutate(time = case_when(
+    hour(open_dt) >= 6 & hour(open_dt) < 12 ~ "morning",
+    hour(open_dt) >= 12 & hour(open_dt) < 18 ~ "afternoon",
+    hour(open_dt) >= 18 | hour(open_dt) <= 6 ~ "night"
+  )) %>% 
+  
 # Add a duration for how long the job took.
 # In period form and hours.
     
@@ -87,7 +96,41 @@ for (var in names(df)) {
 # Change the character variables to factors.
 
 df <- df %>%
-  mutate_at(.vars = factors, as.factor)
+  mutate_at(.vars = factors, as.factor) %>% 
+
+# Drop certain variables that has information already included in other variables.
+
+  select(-completion_time, -promised_time) %>% 
+
+# Drop extremes for completion or promised time.
+# Less than 15 minutes or more than 6 months.
+
+  filter(completion_hours > .25,
+         completion_hours < 4392,
+         promised_hours > .25,
+         promised_hours < 4392)
+
+# Drop the least common reasons for reporting a 311 call.
+# Common is defined as less than 1 percent.
+
+common <- count(df, reason) %>% 
+  
+# Create a percentage variable.
+  
+  mutate(percent = n / nrow(df)) %>% 
+
+# Filter out requests that comprise less than 1%.
+  
+  filter(percent > .01)
+
+# Now filter the entire dataset based on the important reasons.
+
+df <- df %>% 
+  filter(reason %in% common$reason) %>% 
+
+# Refactor the variable so it has only 14 levels.
+  
+  mutate(reason = factor(reason))
 
 # Save the file.
 
