@@ -17,7 +17,7 @@ raw <- read_csv("311_all.csv")
 # In total this is about 683,000 rows.
 
 df <- raw %>% 
-  filter(open_dt < "2016-01-01") %>% 
+  filter(open_dt > "2016-01-01") %>% 
   
 # Select only the variables of interest.
 # No case_title because there are too many to factor them.
@@ -92,3 +92,4 @@ df <- df %>%
 # Save the file.
 
 write_csv(df, "311_cleaned.csv")
+write_rds(df, "311_cleaned.rds")
