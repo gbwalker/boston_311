@@ -234,7 +234,23 @@ errors$RMSE[6] <- RMSE(results_ensemble, ensemble_testing$actual)
 errors <- errors %>%
   mutate(model = factor(model, levels = c("Adaptive Spline", "Linear Regression", "Ridge Regression", "KNN", "Random Forest", "Ensemble")))
 
-# Make a chart of all of them.
+# Save the graphics dataframe for future use.
+
+saveRDS(errors, "models/errors.rds")
+
+# Make a scatter plot of all of them.
+
+ggplot(errors, aes(x = model, y = RMSE, fill = model, col = model)) +
+  geom_point(stat = "identity", aes(size = 2)) +
+  labs(x = "Model", title = "The ensemble model provided the optimal RMSE (409)", col = "Model") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        text = element_text(family = "LM Roman 10"),
+        panel.background = element_blank(),
+        panel.grid.major = element_line(color = "gray"),
+        panel.grid.minor = element_line(color = "gray")) +
+  guides(fill = FALSE, size = FALSE)
+
+# Bar chart.
 
 ggplot(errors, aes(x = model, y = RMSE, fill = model)) +
   geom_bar(stat = "identity") +
