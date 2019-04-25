@@ -2,6 +2,7 @@
 
 library(tidyverse)
 library(caret)
+library(extrafont)
 
 set.seed(12)
 
@@ -45,16 +46,16 @@ df_small <- df_small %>% select(reason, department, month_open, source, fire_dis
 ### Model
 #################
 
-# Create a medium-sized data set to test models with.
+### Create a medium-sized data set to test models with.
 
 df_med <- sample_n(df, round(nrow(df) * .2))
 
 # Create training and test partitions with 90 and 10 percent of the medium data, respectively.
 
-partition <- createDataPartition(df_small$completion_hours, p = 0.90, list = FALSE)
+partition <- createDataPartition(df_med$completion_hours, p = 0.90, list = FALSE)
 
-training <- df_small[partition, ]
-testing <- df_small[-partition, ]
+training <- df_med[partition, ]
+testing <- df_med[-partition, ]
 
 # Run a KNN regression with different values of k.
 
@@ -91,10 +92,10 @@ df <- cbind(df, noise)
 
 # Create a 90-10 partition for the full data.
 
-partition <- createDataPartition(df$completion_hours, p = 0.90, list = FALSE)
+partition <- createDataPartition(df_med$completion_hours, p = 0.90, list = FALSE)
 
-training <- df[partition, ]
-testing <- df[-partition, ]
+training <- df_med[partition, ]
+testing <- df_med[-partition, ]
 
 # Run KNN regression with k = 9.
 
@@ -155,26 +156,92 @@ for (n in c(1:5)) {
   model_results$RMSE[n] <- RMSE(get(name), testing$completion_hours)
 }
 
+# Save all the models.
 
-#################
-### Validation
-#################
+saveRDS(model_knn, "models/model_knn.rds")
+saveRDS(model_lm, "models/model_lm.rds")
+saveRDS(model_spline, "models/model_spline.rds")
+saveRDS(model_ridge, "models/model_ridge.rds")
+saveRDS(model_rf, "models/model_rf.rds")
 
-# 5-fold CV.
-# Tune the models.
+# Save the medium-sized datasets for training and testing.
+
+saveRDS(training, "models/training.rds")
+saveRDS(testing, "models/testing.rds")
 
 #################
 ### Ensemble
 #################
 
-# Bagging: random subsets of training data, then the models vote.
+# Combine the results of all the base-level models.
 
-# Stacking: train a few models on different subsets of the data.
-# Then have a separate model learn from their predictions, or average
-# of the base-level models' predictions.
-# http://dnc1994.com/2016/05/rank-10-percent-in-first-kaggle-competition-en/
+results_all <- tibble(knn = results_knn,
+                      lm = results_lm,
+                      spline = as.double(results_spline),
+                      ridge = results_ridge,
+                      rf = results_rf,
+                      actual = testing$completion_hours) %>% 
 
+# Add a column with the predicted means just to check.
+  
+  mutate(mean = (knn + lm + spline + ridge + rf) / 5) %>% 
+  select(-mean)
 
-# 311 app: https://itunes.apple.com/us/app/bos-311/id330894558?mt=8
-# 311 lookup: http://mayors24.boston.gov/Ef3/General.jsp?form=SSP_TrackCase&page=EntrancePage
+# Save all of the predictions for the 7,896 predictions.
 
+saveRDS(results_all, "models/results_all.rds")
+
+# Create a test and training set of the total results.
+
+partition <- createDataPartition(results_all$actual, p = 0.75, list = FALSE)
+
+ensemble_training <- results_all[partition, ]
+ensemble_testing <- results_all[-partition, ]
+
+# Train another spline on the results of the base-level models.
+# After trying to fit all the models above as the meta-model, a spline had
+# the lowest RMSE (around 338 for the 1% data set).
+
+ensemble_spline <- train(actual ~ .,
+                  data = ensemble_training,
+                  method = "earth",
+                  trControl = tr)
+
+results_ensemble <- predict(ensemble_spline, ensemble_testing[,-6])
+
+RMSE(results_ensemble, ensemble_testing$actual)
+
+#################
+### Graphics
+#################
+
+# Make an array of all the models' RMSEs.
+
+errors <- tibble(model = c("KNN", "Linear Regression", "Adaptive Spline", "Ridge Regression", "Random Forest", "Ensemble"),
+                 RMSE = NA)
+
+# Save all the RMSEs.
+
+errors$RMSE[1] <- RMSE(results_all$knn, results_all$actual)
+errors$RMSE[2] <- RMSE(results_all$lm, results_all$actual)
+errors$RMSE[3] <- RMSE(results_all$spline, results_all$actual)
+errors$RMSE[4] <- RMSE(results_all$ridge, results_all$actual)
+errors$RMSE[5] <- RMSE(results_all$rf, results_all$actual)
+errors$RMSE[6] <- RMSE(results_ensemble, ensemble_testing$actual)
+
+# Change the order of the models for graphing.
+
+errors <- errors %>%
+  mutate(model = factor(model, levels = c("Adaptive Spline", "Linear Regression", "Ridge Regression", "KNN", "Random Forest", "Ensemble")))
+
+# Make a chart of all of them.
+
+ggplot(errors, aes(x = model, y = RMSE, fill = model)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Model", title = "The ensemble model provided the optimal RMSE (409)", fill = "Model") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        text=element_text(family = "LM Roman 10"),
+        panel.background = element_blank()) +
+  scale_y_continuous(expand = c(0,0))
+
+  expand_limits(y = c(400, 430))
