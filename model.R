@@ -241,14 +241,14 @@ saveRDS(errors, "models/errors.rds")
 # Make a scatter plot of all of them.
 
 ggplot(errors, aes(x = model, y = RMSE, fill = model, col = model)) +
-  geom_point(stat = "identity", aes(size = 2)) +
+  geom_point(stat = "identity", size = 8) +
   labs(x = "Model", title = "The ensemble model provided the optimal RMSE (409)", col = "Model") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        text = element_text(family = "LM Roman 10"),
+        text = element_text(family = "LM Roman 10", size = 32),
         panel.background = element_blank(),
         panel.grid.major = element_line(color = "gray"),
         panel.grid.minor = element_line(color = "gray")) +
-  guides(fill = FALSE, size = FALSE)
+  guides(fill = FALSE, size = FALSE, col = FALSE)
 
 # Bar chart.
 
@@ -261,3 +261,18 @@ ggplot(errors, aes(x = model, y = RMSE, fill = model)) +
   scale_y_continuous(expand = c(0,0))
 
   expand_limits(y = c(400, 430))
+
+# Completion hours by city council district.
+# Note that you must filter out city_council_district == 0 first.
+# df <- df %>% filter(! city_council_district == 0)
+# also choose only the top few reasons...
+  
+ggplot(df, aes(reason, completion_hours/1000000, col = reason, fill = reason)) +
+  geom_col() +
+  facet_wrap(~city_council_district, ncol = 3) +
+  labs(x = "Reason", y = "Total completion hours (million)", title = "Completion hours by issue for each city council district", fill = "Reason") +
+  theme(axis.text.x = element_blank(),
+        panel.background = element_blank(),
+        text = element_text(size = 24)) +
+  guides(col = FALSE)
+  
