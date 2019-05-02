@@ -240,11 +240,12 @@ saveRDS(errors, "models/errors.rds")
 
 # Make a scatter plot of all of them.
 
-ggplot(errors, aes(x = model, y = RMSE, fill = model, col = model)) +
+ggplot(errors2, aes(x = model, y = days, fill = model, col = model)) +
   geom_point(stat = "identity", size = 8) +
-  labs(x = "Model", title = "The ensemble model provided the optimal RMSE (409)", col = "Model") +
+  labs(x = "Model", y = "RMSE (days)", title = "The ensemble model improves on Boston’s \n predicted response time by 5 days.", col = "Model") +
+  # scale_y_continuous(breaks = seq(400, 540, by = 20)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        text = element_text(family = "LM Roman 10", size = 32),
+        text = element_text(family = "LM Roman 10", size = 18),
         panel.background = element_blank(),
         panel.grid.major = element_line(color = "gray"),
         panel.grid.minor = element_line(color = "gray")) +
